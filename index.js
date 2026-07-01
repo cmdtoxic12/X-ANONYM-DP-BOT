@@ -14,7 +14,7 @@ const { getText, isOwner } = require("./lib/functions");
 const { loadSettings, saveSettings } = require("./lib/settings");
 
 const AUTH_FOLDER = "auth_info_baileys";
-const DP_FOLDER = "./dps";
+const DP_FOLDER = "./images";
 
 let sock;
 let currentDpIndex = 0;
