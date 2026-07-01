@@ -1,0 +1,373 @@
+const fs = require("fs");
+const path = require("path");
+
+const WORD_FILE = path.join(__dirname, "../data/words.txt");
+
+let wordSet = new Set();
+
+function loadDictionary() {
+  try {
+    const words = fs
+      .readFileSync(WORD_FILE, "utf8")
+      .split(/\r?\n/)
+      .map(word => word.trim().toLowerCase())
+      .filter(Boolean);
+
+    wordSet = new Set(words);
+
+    console.log(`✅ Dictionary loaded: ${wordSet.size} words`);
+  } catch (err) {
+    console.log("❌ Failed to load dictionary:", err.message);
+  }
+}
+
+loadDictionary();
+
+const wcgGames = new Map();
+
+const JOIN_TIME = 60 * 1000;
+const TURN_TIME = 30 * 1000;
+
+module.exports = {
+  name: "wcg",
+  aliases: ["wordchain", "chain"],
+
+  async execute({ sock, from, msg, sender, args }) {
+    const chatId = from;
+    const sub = args[0]?.toLowerCase();
+    const game = wcgGames.get(chatId);
+
+    if (!sub) {
+      if (game) {
+        return reply(sock, from, msg, "⚠️ Game already running.\nType `.wcg end` to stop it.");
+      }
+
+      const newGame = {
+        owner: sender,
+        players: new Map([[sender, { joinedAt: Date.now() }]]),
+        phase: "joining",
+        currentTurn: null,
+        requiredLetter: null,
+        requiredLength: null,
+        usedWords: new Set(),
+        wordsPlayed: 0,
+        startedAt: Date.now(),
+        joinTimer: null,
+        turnTimer: null,
+      };
+
+      wcgGames.set(chatId, newGame);
+
+      await sock.sendMessage(
+        from,
+        {
+          text:
+            `🎮 *WORD CHAIN GAME INITIATED!*\n\n` +
+            `👑 Host: @${sender.split("@")[0]}\n` +
+            `⏳ Joining closes in *60 seconds*.\n\n` +
+            `Type *join* to participate.\n\n` +
+            `👥 Players: 1\n` +
+            `1. @${sender.split("@")[0]}`,
+          mentions: [sender],
+        },
+        { quoted: msg }
+      );
+
+      newGame.joinTimer = setTimeout(() => startGame(sock, chatId), JOIN_TIME);
+      return;
+    }
+
+    if (sub === "end") {
+      if (!game) {
+        return reply(sock, from, msg, "❌ No Word Chain Game is running.");
+      }
+
+      clearTimeout(game.joinTimer);
+      clearTimeout(game.turnTimer);
+      wcgGames.delete(chatId);
+
+      return reply(sock, from, msg, "🏁 Word Chain Game ended.");
+    }
+  },
+
+  async before({ sock, from, msg, sender }) {
+    const game = wcgGames.get(from);
+    if (!game) return;
+
+    const text = getMessageText(msg).trim().toLowerCase();
+
+    if (!text) return;
+
+    if (text === ".wcg end") {
+      clearTimeout(game.joinTimer);
+      clearTimeout(game.turnTimer);
+      wcgGames.delete(from);
+      return reply(sock, from, msg, "🏁 Word Chain Game ended.");
+    }
+
+    if (game.phase === "joining") {
+      if (text === "join") {
+        return joinGame(sock, from, msg, sender, game);
+      }
+
+      return;
+    }
+
+    if (game.phase === "playing") {
+      if (text.startsWith(".")) return;
+
+      if (sender !== game.currentTurn) return;
+
+      return handlePlayerWord(sock, from, msg, sender, text, game);
+    }
+  },
+};
+
+async function joinGame(sock, from, msg, sender, game) {
+  if (game.players.has(sender)) {
+    return sock.sendMessage(
+      from,
+      {
+        text: `⚠️ @${sender.split("@")[0]}, you already joined.`,
+        mentions: [sender],
+      },
+      { quoted: msg }
+    );
+  }
+
+  game.players.set(sender, { joinedAt: Date.now() });
+
+  const players = Array.from(game.players.keys());
+
+  return sock.sendMessage(
+    from,
+    {
+      text:
+        `✅ @${sender.split("@")[0]} joined the game!\n\n` +
+        `👥 Players: ${players.length}\n` +
+        players.map((p, i) => `${i + 1}. @${p.split("@")[0]}`).join("\n"),
+      mentions: players,
+    },
+    { quoted: msg }
+  );
+}
+
+async function startGame(sock, chatId) {
+  const game = wcgGames.get(chatId);
+  if (!game || game.phase !== "joining") return;
+
+  if (game.players.size < 2) {
+    await sock.sendMessage(chatId, {
+      text: "❌ Not enough players joined.\nGame cancelled.",
+    });
+
+    wcgGames.delete(chatId);
+    return;
+  }
+
+  game.phase = "playing";
+  game.currentTurn = Array.from(game.players.keys())[0];
+
+  await sock.sendMessage(chatId, {
+    text:
+      `🎉 *GAME STARTED!*\n\n` +
+      `👥 Players:\n` +
+      Array.from(game.players.keys())
+        .map((p, i) => `${i + 1}. @${p.split("@")[0]}`)
+        .join("\n"),
+    mentions: Array.from(game.players.keys()),
+  });
+
+  sendTurn(sock, chatId);
+}
+
+async function handlePlayerWord(sock, from, msg, sender, word, game) {
+  const cleanWord = word.replace(/[^a-z]/g, "");
+
+  if (!cleanWord) return;
+
+  if (cleanWord.length !== game.requiredLength) {
+    return reply(
+      sock,
+      from,
+      msg,
+      `❌ Invalid word.\n\nRequired: *${game.requiredLength} letters*`
+    );
+  }
+
+  if (cleanWord[0] !== game.requiredLetter) {
+    return reply(
+      sock,
+      from,
+      msg,
+      `❌ Invalid word.\n\nMust start with: *${game.requiredLetter.toUpperCase()}*`
+    );
+  }
+
+  if (game.usedWords.has(cleanWord)) {
+    return reply(sock, from, msg, "❌ This word has already been used.");
+  }
+  
+  if (!isRealWord(cleanWord)) {
+  return reply(
+    sock,
+    from,
+    msg,
+    `❌ *${cleanWord.toUpperCase()}* is not in the dictionary.`
+  );
+}
+
+  clearTimeout(game.turnTimer);
+
+  game.usedWords.add(cleanWord);
+  game.wordsPlayed++;
+
+  await sock.sendMessage(
+    from,
+    {
+      text: `✅ *${cleanWord.toUpperCase()}* accepted!`,
+    },
+    { quoted: msg }
+  );
+
+  nextTurn(sock, from, sender);
+}
+
+function sendTurn(sock, chatId) {
+  const game = wcgGames.get(chatId);
+  if (!game) return;
+
+  game.requiredLetter = randomLetter();
+  game.requiredLength = getWordLength(game.players.size);
+
+  clearTimeout(game.turnTimer);
+
+  const players = Array.from(game.players.keys());
+  const currentIndex = players.indexOf(game.currentTurn);
+  const nextPlayer = players[(currentIndex + 1) % players.length];
+
+  sock.sendMessage(chatId, {
+    text:
+      `━━━━━━━━━━━━━━━\n` +
+      `🎯 *WORD CHAIN*\n\n` +
+      `👤 Turn: @${game.currentTurn.split("@")[0]}\n\n` +
+      `📝 Required word:\n` +
+      `• Starts with: *${game.requiredLetter.toUpperCase()}*\n` +
+      `• Length: *${game.requiredLength} letters*\n\n` +
+      `⏳ Time: *30 seconds*\n` +
+      `➡️ Next player: @${nextPlayer.split("@")[0]}\n` +
+      `━━━━━━━━━━━━━━━`,
+    mentions: [game.currentTurn, nextPlayer],
+  });
+
+  game.turnTimer = setTimeout(() => eliminatePlayer(sock, chatId), TURN_TIME);
+}
+
+function nextTurn(sock, chatId, previousPlayer) {
+  const game = wcgGames.get(chatId);
+  if (!game) return;
+
+  const players = Array.from(game.players.keys());
+  const index = players.indexOf(previousPlayer);
+
+  game.currentTurn = players[(index + 1) % players.length];
+
+  sendTurn(sock, chatId);
+}
+
+async function eliminatePlayer(sock, chatId) {
+  const game = wcgGames.get(chatId);
+  if (!game) return;
+
+  const failedPlayer = game.currentTurn;
+  const playersBefore = Array.from(game.players.keys());
+  const failedIndex = playersBefore.indexOf(failedPlayer);
+
+  game.players.delete(failedPlayer);
+
+  await sock.sendMessage(chatId, {
+    text:
+      `⏰ *Time's up!*\n\n` +
+      `❌ @${failedPlayer.split("@")[0]} has been eliminated.\n\n` +
+      `👥 Players remaining: ${game.players.size}`,
+    mentions: [failedPlayer],
+  });
+
+  if (game.players.size <= 1) {
+    return endWithWinner(sock, chatId);
+  }
+
+  const remaining = Array.from(game.players.keys());
+  game.currentTurn = remaining[failedIndex % remaining.length];
+
+  sendTurn(sock, chatId);
+}
+
+async function endWithWinner(sock, chatId) {
+  const game = wcgGames.get(chatId);
+  if (!game) return;
+
+  const winner = Array.from(game.players.keys())[0];
+  const duration = formatDuration(Date.now() - game.startedAt);
+
+  clearTimeout(game.joinTimer);
+  clearTimeout(game.turnTimer);
+  wcgGames.delete(chatId);
+
+  if (!winner) {
+    return sock.sendMessage(chatId, {
+      text: "🏁 Game over. No winner.",
+    });
+  }
+
+  return sock.sendMessage(chatId, {
+    text:
+      `🏆 *GAME OVER!*\n\n` +
+      `🥇 Winner: @${winner.split("@")[0]}\n\n` +
+      `📝 Words played: ${game.wordsPlayed}\n` +
+      `⏱️ Duration: ${duration}\n\n` +
+      `Congratulations!`,
+    mentions: [winner],
+  });
+}
+
+function getWordLength(playersLeft) {
+  if (playersLeft >= 8) return randomBetween(3, 4);
+  if (playersLeft >= 5) return randomBetween(4, 5);
+  if (playersLeft >= 3) return randomBetween(5, 6);
+  return randomBetween(6, 8);
+}
+
+function randomLetter() {
+  const letters = "aaaabbccddeeeeffgghhiikkllmmnnooppprrrssssttttuuwy";
+  return letters[Math.floor(Math.random() * letters.length)];
+}
+
+function randomBetween(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function formatDuration(ms) {
+  const seconds = Math.floor(ms / 1000);
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
+}
+
+function isRealWord(word) {
+  return wordSet.has(word.toLowerCase());
+}
+
+function getMessageText(msg) {
+  return (
+    msg.message?.conversation ||
+    msg.message?.extendedTextMessage?.text ||
+    msg.message?.imageMessage?.caption ||
+    msg.message?.videoMessage?.caption ||
+    ""
+  );
+}
+
+function reply(sock, from, msg, text) {
+  return sock.sendMessage(from, { text }, { quoted: msg });
+}
