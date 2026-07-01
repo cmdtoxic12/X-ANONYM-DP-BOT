@@ -1,0 +1,7 @@
+module.exports = {
+  BOT_NAME: "C-LICON AUTO DP BOT",
+  OWNER_NAME: "Promise Vifa",
+  OWNER_NUMBER: "233XXXXXXXXX",
+  PREFIX: ".",
+  DP_CHANGE_INTERVAL: 24 * 60 * 60 * 1000
+};

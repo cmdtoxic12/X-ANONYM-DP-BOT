@@ -1,0 +1,31 @@
+{
+  "name": "clicon-auto-dp-bot",
+  "version": "1.0.0",
+  "description": "C-LICON WhatsApp Multi-Utility Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "baileys",
+    "bot",
+    "word-chain",
+    "auto-dp"
+  ],
+  "author": "Promise Vifa",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.20",
+    "fs-extra": "^11.3.0",
+    "pino": "^9.7.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
