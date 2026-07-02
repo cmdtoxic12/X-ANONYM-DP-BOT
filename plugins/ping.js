@@ -1,5 +1,6 @@
 module.exports = {
   name: "ping",
+  category: "main",
   description: "Check bot speed",
   async execute({ sock, from, msg }) {
     const start = Date.now();
