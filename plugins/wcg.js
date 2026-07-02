@@ -5,6 +5,7 @@ const TURN_TIME = 30 * 1000;
 
 module.exports = {
   name: "wcg",
+  category: "games",
   description: "Multiplayer Word Chain Game",
   aliases: ["wordchain", "chain"],
 
