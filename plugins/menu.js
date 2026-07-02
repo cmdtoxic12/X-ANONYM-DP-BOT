@@ -19,13 +19,25 @@ function formatRam() {
   return `${used.toFixed(0)} MB / ${total.toFixed(0)} MB`;
 }
 
+function buildCategory(plugins, category, prefix) {
+  const list = [];
+
+  for (const plugin of plugins.values()) {
+    if (plugin.category === category && plugin.name !== "menu") {
+      list.push(`┃ ❯❯ ${prefix}${plugin.name}`);
+    }
+  }
+
+  return list.length ? list.join("\n") : "┃ No commands yet";
+}
+
 module.exports = {
   name: "menu",
+  category: "main",
   description: "Show stylish command menu",
 
   async execute({ sock, from, msg, plugins }) {
-    const start = Date.now();
-    const speed = Date.now() - start;
+    const speed = Date.now() - Date.now();
 
     const menuText = `
 ╭━━〔 ◈ ${config.BOT_NAME} ◈ 〕━━⬣
@@ -41,34 +53,27 @@ module.exports = {
 ╰━━━━━━━━━━━━━━━━⬣
 
 ╭──〔 📌 MAIN MENU 〕──⬣
-┃ ❯❯ ${config.PREFIX}menu
-┃ ❯❯ ${config.PREFIX}ping
-┃ ❯❯ ${config.PREFIX}alive
-┃ ❯❯ ${config.PREFIX}runtime
-┃ ❯❯ ${config.PREFIX}owner
+${buildCategory(plugins, "main", config.PREFIX)}
+╰━━━━━━━━━━━━━━━━⬣
+
+╭──〔 📥 DOWNLOAD MENU 〕──⬣
+${buildCategory(plugins, "download", config.PREFIX)}
 ╰━━━━━━━━━━━━━━━━⬣
 
 ╭──〔 🎮 GAME MENU 〕──⬣
-┃ ❯❯ ${config.PREFIX}wcg
-╰━━━━━━━━━━━━━━━━⬣
-
-╭──〔 🖼️ DP SYSTEM 〕──⬣
-┃ ❯❯ ${config.PREFIX}change
+${buildCategory(plugins, "games", config.PREFIX)}
 ╰━━━━━━━━━━━━━━━━⬣
 
 ╭──〔 ⚙️ SETTINGS MENU 〕──⬣
-┃ ❯❯ ${config.PREFIX}settings
-┃ ❯❯ ${config.PREFIX}autoread on/off
-┃ ❯❯ ${config.PREFIX}autotyping on/off
-┃ ❯❯ ${config.PREFIX}alwaysonline on/off
-┃ ❯❯ ${config.PREFIX}autostatusview on/off
-┃ ❯❯ ${config.PREFIX}autostatusreact on/off ❤️
+${buildCategory(plugins, "settings", config.PREFIX)}
 ╰━━━━━━━━━━━━━━━━⬣
 
-╭──〔 🔧 INFO 〕──⬣
-┃ Host : Panel
-┃ Platform : WhatsApp Baileys
-┃ Runtime : Node.js
+╭──〔 🖼️ DP SYSTEM 〕──⬣
+${buildCategory(plugins, "dp", config.PREFIX)}
+╰━━━━━━━━━━━━━━━━⬣
+
+╭──〔 🔧 UTILITY MENU 〕──⬣
+${buildCategory(plugins, "utility", config.PREFIX)}
 ╰━━━━━━━━━━━━━━━━⬣
 
 > Powered by ${config.BOT_NAME}
@@ -77,7 +82,7 @@ module.exports = {
     await sock.sendMessage(
       from,
       {
-        image: { url: "https://files.catbox.moe/m1t25y.png" },
+        image: { url: "./assets/menu.jpg" },
         caption: menuText,
       },
       { quoted: msg }
