@@ -38,9 +38,15 @@ module.exports = {
       requiredLength: null,
       usedWords: new Set(),
       wordsPlayed: 0,
+      round: 1,
+difficulty: {
+  minLength: 3,
+  time: 45 * 1000
+},
       startedAt: Date.now(),
       joinTimer: null,
       turnTimer: null,
+      turnMessageId: null,
     };
 
     wcgGames.set(chatId, newGame);
@@ -85,11 +91,16 @@ module.exports = {
     }
 
     if (game.phase === "playing") {
-      if (text.startsWith(".")) return;
-      if (sender !== game.currentTurn) return;
+  if (text.startsWith(".")) return;
+  if (sender !== game.currentTurn) return;
 
-      return handlePlayerWord(sock, from, msg, sender, text, game);
-    }
+  const quotedId =
+    msg.message?.extendedTextMessage?.contextInfo?.stanzaId;
+
+  if (quotedId !== game.turnMessageId) return;
+
+  return handlePlayerWord(sock, from, msg, sender, text, game);
+}
   },
 };
 
@@ -156,9 +167,14 @@ async function handlePlayerWord(sock, from, msg, sender, word, game) {
 
   if (!cleanWord) return;
 
-  if (cleanWord.length !== game.requiredLength) {
-    return reply(sock, from, msg, `❌ Invalid word.\nRequired: *${game.requiredLength} letters*`);
-  }
+  if (cleanWord.length < game.requiredLength) {
+  return reply(
+    sock,
+    from,
+    msg,
+    `❌ Invalid word.\nMinimum required: *${game.requiredLength} letters*`
+  );
+}
 
   if (cleanWord[0] !== game.requiredLetter) {
     return reply(sock, from, msg, `❌ Invalid word.\nMust start with: *${game.requiredLetter.toUpperCase()}*`);
@@ -182,12 +198,14 @@ async function handlePlayerWord(sock, from, msg, sender, word, game) {
   nextTurn(sock, from, sender);
 }
 
-function sendTurn(sock, chatId) {
+async function sendTurn(sock, chatId) {
   const game = wcgGames.get(chatId);
   if (!game) return;
 
+  updateDifficulty(game);
+
   game.requiredLetter = randomLetter();
-  game.requiredLength = getWordLength(game.players.size);
+  game.requiredLength = game.difficulty.minLength;
 
   clearTimeout(game.turnTimer);
 
@@ -195,21 +213,26 @@ function sendTurn(sock, chatId) {
   const currentIndex = players.indexOf(game.currentTurn);
   const nextPlayer = players[(currentIndex + 1) % players.length];
 
-  sock.sendMessage(chatId, {
+  const timeSeconds = Math.floor(game.difficulty.time / 1000);
+
+  const sent = await sock.sendMessage(chatId, {
     text:
       `━━━━━━━━━━━━━━━\n` +
       `🎯 *WORD CHAIN*\n\n` +
+      `🏁 Round: *${game.round}*\n` +
       `👤 Turn: @${game.currentTurn.split("@")[0]}\n\n` +
       `📝 Required word:\n` +
       `• Starts with: *${game.requiredLetter.toUpperCase()}*\n` +
-      `• Length: *${game.requiredLength} letters*\n\n` +
-      `⏳ Time: *30 seconds*\n` +
+      `• Minimum length: *${game.requiredLength} letters*\n\n` +
+      `⏳ Time: *${timeSeconds} seconds*\n` +
       `➡️ Next player: @${nextPlayer.split("@")[0]}\n` +
       `━━━━━━━━━━━━━━━`,
     mentions: [game.currentTurn, nextPlayer],
   });
 
-  game.turnTimer = setTimeout(() => eliminatePlayer(sock, chatId), TURN_TIME);
+  game.turnMessageId = sent.key.id;
+
+  game.turnTimer = setTimeout(() => eliminatePlayer(sock, chatId), game.difficulty.time);
 }
 
 function nextTurn(sock, chatId, previousPlayer) {
@@ -280,13 +303,6 @@ async function endWithWinner(sock, chatId) {
   });
 }
 
-function getWordLength(playersLeft) {
-  if (playersLeft >= 8) return randomBetween(3, 4);
-  if (playersLeft >= 5) return randomBetween(4, 5);
-  if (playersLeft >= 3) return randomBetween(5, 6);
-  return randomBetween(6, 8);
-}
-
 function randomLetter() {
   const letters = "aaaabbccddeeeeffgghhiikkllmmnnooppprrrssssttttuuwy";
   return letters[Math.floor(Math.random() * letters.length)];
@@ -301,6 +317,36 @@ function formatDuration(ms) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}m ${s}s`;
+}
+
+function updateDifficulty(game) {
+  const words = game.wordsPlayed;
+
+  if (words < 5) {
+    game.difficulty.minLength = 3;
+    game.difficulty.time = 45 * 1000;
+    game.round = 1;
+  } else if (words < 10) {
+    game.difficulty.minLength = 4;
+    game.difficulty.time = 40 * 1000;
+    game.round = 2;
+  } else if (words < 15) {
+    game.difficulty.minLength = 5;
+    game.difficulty.time = 35 * 1000;
+    game.round = 3;
+  } else if (words < 20) {
+    game.difficulty.minLength = 6;
+    game.difficulty.time = 30 * 1000;
+    game.round = 4;
+  } else if (words < 30) {
+    game.difficulty.minLength = 7;
+    game.difficulty.time = 25 * 1000;
+    game.round = 5;
+  } else {
+    game.difficulty.minLength = 8;
+    game.difficulty.time = 20 * 1000;
+    game.round = 6;
+  }
 }
 
 function getText(msg) {
