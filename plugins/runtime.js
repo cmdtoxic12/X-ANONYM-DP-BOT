@@ -2,6 +2,7 @@ const { runtime } = require("../lib/functions");
 
 module.exports = {
   name: "runtime",
+  category: "main",
   description: "Show bot uptime",
   async execute({ sock, from, msg }) {
     await sock.sendMessage(
