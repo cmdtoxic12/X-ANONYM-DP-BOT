@@ -3,6 +3,7 @@ const { runtime } = require("../lib/functions");
 
 module.exports = {
   name: "alive",
+  category: "main",
   description: "Show bot alive message",
   async execute({ sock, from, msg }) {
     await sock.sendMessage(
