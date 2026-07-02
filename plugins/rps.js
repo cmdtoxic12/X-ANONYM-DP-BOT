@@ -1,5 +1,6 @@
 module.exports = {
   name: "rps",
+  category: "games",
   description: "Play Rock Paper Scissors with the bot (.rps rock / paper / scissors)",
   aliases: ["rock", "paper", "scissors"],
 
