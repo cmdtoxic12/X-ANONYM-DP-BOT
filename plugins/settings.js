@@ -2,6 +2,8 @@ const { loadSettings } = require("../lib/settings");
 
 module.exports = {
   name: "settings",
+  category: "main",
+  
   async execute({ sock, from, msg }) {
     const s = await loadSettings();
 
