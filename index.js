@@ -80,27 +80,34 @@ async function getDPFiles() {
 
 async function changeProfilePicture() {
   try {
+    console.log("🔄 changeProfilePicture() called");
+
     const dpFiles = await getDPFiles();
+    console.log("📁 DP files found:", dpFiles);
 
     if (dpFiles.length === 0) {
-      console.log("⚠️ No DP images found.");
+      console.log("⚠️ No DP images found in dps folder.");
       return;
     }
 
     const imagePath = dpFiles[currentDpIndex % dpFiles.length];
     currentDpIndex++;
 
+    console.log("🖼️ Selected image:", imagePath);
+
     const buffer = await fs.readFile(imagePath);
+    console.log("📦 Image buffer size:", buffer.length);
+
     const jid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+    console.log("👤 Updating JID:", jid);
 
     await sock.updateProfilePicture(jid, buffer);
 
-    console.log(`✅ DP changed: ${path.basename(imagePath)}`);
+    console.log(`✅ DP changed successfully: ${path.basename(imagePath)}`);
   } catch (err) {
-    console.error("❌ Failed to change DP:", err.message);
+    console.error("❌ Failed to change DP:", err);
   }
 }
-
 async function handleSettingCommands(sock, msg, command, args) {
   const from = msg.key.remoteJid;
   const settings = await loadSettings();
@@ -207,7 +214,15 @@ async function startBot() {
   if (!msg.message) return;
 
   const from = msg.key.remoteJid;
-  const sender = msg.key.participant || msg.key.remoteJid;
+  const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+
+let sender;
+
+if (msg.key.fromMe) {
+  sender = botJid;
+} else {
+  sender = msg.key.participant || msg.key.remoteJid;
+}
 
   const settings = await loadSettings();
 
@@ -224,27 +239,18 @@ async function startBot() {
 
   if (from === "status@broadcast") {
   if (settings.autostatusview) {
-    sock.readMessages([msg.key]).catch((err) => {
-      console.log("❌ Status view failed:", err.message);
-    });
+    await sock.readMessages([msg.key]);
 
-    console.log("👀 Viewed status");
-  }
+    console.log("━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("👀 STATUS VIEWED");
+    console.log("From:", msg.key.participant || "Unknown");
+    console.log("Time:", new Date().toLocaleString());
+    console.log("━━━━━━━━━━━━━━━━━━━━━━");
+}
 
   if (settings.autostatusreact) {
-    setTimeout(() => {
-      sock.sendMessage(from, {
-        react: {
-          text: settings.statusReactEmoji || "❤️",
-          key: msg.key,
-        },
-      }).then(() => {
-        console.log("❤️ Reacted to status");
-      }).catch((err) => {
-        console.log("❌ Status react failed:", err.message);
-      });
-    }, 1500);
-  }
+  console.log("⚠️ Auto status react is enabled, but disabled in code for stability.");
+}
 
   return;
 }
@@ -308,21 +314,33 @@ async function startBot() {
       const { connection, lastDisconnect } = update;
 
       if (connection === "open") {
-        console.log("✅ Successfully connected to WhatsApp!");
-        console.log(`👤 JID: ${sock.user.id}`);
+  console.log("✅ Successfully connected to WhatsApp!");
+  console.log(`👤 JID: ${sock.user.id}`);
 
-        const settings = await loadSettings();
+  const ownerJid = config.OWNER_NUMBER + "@s.whatsapp.net";
 
-        if (settings.alwaysonline) {
-          await sock.sendPresenceUpdate("available");
-        }
+  await sock.sendMessage(ownerJid, {
+    text:
+      `✅ *${config.BOT_NAME} CONNECTED*\n\n` +
+      `🤖 Bot is now online.\n` +
+      `🔄 Status: Connected / Restarted\n` +
+      `👤 JID: ${sock.user.id}\n` +
+      `⏱️ Time: ${new Date().toLocaleString()}\n\n` +
+      `Use ${config.PREFIX}menu to view commands.`
+  });
 
-        if (dpInterval) clearInterval(dpInterval);
+  const settings = await loadSettings();
 
-        await changeProfilePicture();
+  if (settings.alwaysonline) {
+    await sock.sendPresenceUpdate("available");
+  }
 
-        dpInterval = setInterval(changeProfilePicture, config.DP_CHANGE_INTERVAL);
-      }
+  if (dpInterval) clearInterval(dpInterval);
+
+  // await changeProfilePicture();
+
+  dpInterval = setInterval(changeProfilePicture, config.DP_CHANGE_INTERVAL);
+}
 
       if (connection === "close") {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
@@ -339,7 +357,10 @@ async function startBot() {
         }
 
         console.log("🔄 Reconnecting in 5 seconds...");
-        setTimeout(startBot, 5000);
+        setTimeout(() => {
+    sock?.end?.();
+    startBot();
+}, 5000);
       }
     });
   } catch (err) {
