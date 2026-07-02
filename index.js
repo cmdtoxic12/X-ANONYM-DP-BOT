@@ -224,9 +224,14 @@ async function startBot() {
 
   if (from === "status@broadcast") {
     if (settings.autostatusview) {
-      await sock.readMessages([msg.key]);
-      console.log("👀 Viewed status");
-    }
+    await sock.readMessages([msg.key]);
+
+    console.log("━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("👀 STATUS VIEWED");
+    console.log("From:", msg.key.participant || "Unknown");
+    console.log("Time:", new Date().toLocaleString());
+    console.log("━━━━━━━━━━━━━━━━━━━━━━");
+}
 
     if (settings.autostatusreact) {
       try {
