@@ -223,33 +223,31 @@ async function startBot() {
   }
 
   if (from === "status@broadcast") {
-    if (settings.autostatusview) {
-    await sock.readMessages([msg.key]);
+  if (settings.autostatusview) {
+    sock.readMessages([msg.key]).catch((err) => {
+      console.log("❌ Status view failed:", err.message);
+    });
 
-    console.log("━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("👀 STATUS VIEWED");
-    console.log("From:", msg.key.participant || "Unknown");
-    console.log("Time:", new Date().toLocaleString());
-    console.log("━━━━━━━━━━━━━━━━━━━━━━");
-}
-
-    if (settings.autostatusreact) {
-      try {
-        await sock.sendMessage(from, {
-          react: {
-            text: settings.statusReactEmoji || "❤️",
-            key: msg.key,
-          },
-        });
-
-        console.log("❤️ Reacted to status");
-      } catch (err) {
-        console.log("❌ Status react failed:", err.message);
-      }
-    }
-
-    return;
+    console.log("👀 Viewed status");
   }
+
+  if (settings.autostatusreact) {
+    setTimeout(() => {
+      sock.sendMessage(from, {
+        react: {
+          text: settings.statusReactEmoji || "❤️",
+          key: msg.key,
+        },
+      }).then(() => {
+        console.log("❤️ Reacted to status");
+      }).catch((err) => {
+        console.log("❌ Status react failed:", err.message);
+      });
+    }, 1500);
+  }
+
+  return;
+}
 
   //if (msg.key.fromMe) return;
 
