@@ -2,6 +2,7 @@ const games = new Map();
 
 module.exports = {
   name: "tictactoe",
+  category: "games",
   aliases: ["ttt"],
 
   async execute({ sock, from, msg, sender }) {
