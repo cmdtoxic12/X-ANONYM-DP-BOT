@@ -30,14 +30,6 @@ const ownerOnlyCommands = [
   "autostatusreact"
 ];
 
-if (ownerOnlyCommands.includes(command) && !isOwner(msg, config.OWNER_NUMBER)) {
-  return sock.sendMessage(
-    from,
-    { text: "❌ This command is owner-only." },
-    { quoted: msg }
-  );
-}
-
 function loadPlugins() {
   const pluginFolder = path.join(__dirname, "plugins");
 
@@ -254,7 +246,7 @@ async function startBot() {
     return;
   }
 
-  if (msg.key.fromMe) return;
+  //if (msg.key.fromMe) return;
 
   // ✅ This allows games like WCG to read normal messages like "join" or "apple"
   for (const plugin of plugins.values()) {
@@ -273,6 +265,14 @@ async function startBot() {
 
   const args = body.slice(config.PREFIX.length).trim().split(/\s+/);
   const command = args.shift().toLowerCase();
+
+  if (ownerOnlyCommands.includes(command) && !isOwner(msg, config.OWNER_NUMBER)) {
+  return sock.sendMessage(
+    from,
+    { text: "❌ This command is owner-only." },
+    { quoted: msg }
+  );
+}
 
   const settingResult = await handleSettingCommands(sock, msg, command, args);
   if (settingResult !== false) return;
