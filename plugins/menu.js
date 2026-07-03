@@ -68,6 +68,10 @@ ${buildCategory(plugins, "games", config.PREFIX)}
 ${buildCategory(plugins, "settings", config.PREFIX)}
 ╰━━━━━━━━━━━━━━━━⬣
 
+╭──〔 👥 GROUP MENU 〕──⬣
+${buildCategory(plugins, "group", config.PREFIX)}
+╰━━━━━━━━━━━━━━━━⬣
+
 ╭──〔 🖼️ DP SYSTEM 〕──⬣
 ${buildCategory(plugins, "dp", config.PREFIX)}
 ╰━━━━━━━━━━━━━━━━⬣
