@@ -357,10 +357,29 @@ if (msg.key.fromMe) {
         }
 
         console.log("🔄 Reconnecting in 5 seconds...");
+       if (connection === "close") {
+    const shouldReconnect =
+        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+
+    console.log(
+        "Connection closed:",
+        lastDisconnect?.error?.output?.statusCode
+    );
+
+    if (shouldReconnect) {
+        try {
+            sock.ev.removeAllListeners();
+            sock.ws?.close?.();
+        } catch {}
+
         setTimeout(() => {
-    sock?.end?.();
-    startBot();
-}, 5000);
+            console.log("🔄 Reconnecting...");
+            startBot();
+        }, 5000);
+    } else {
+        console.log("❌ Logged out. Delete auth_info_baileys and pair again.");
+    }
+}
       }
     });
   } catch (err) {
