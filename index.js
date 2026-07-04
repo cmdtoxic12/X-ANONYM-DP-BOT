@@ -181,13 +181,15 @@ async function startBot() {
     const { version } = await fetchLatestBaileysVersion();
 
     sock = makeWASocket({
-      version,
-      auth: state,
-      logger: pino({ level: "silent" }),
-      printQRInTerminal: false,
-      markOnlineOnConnect: true,
-      browser: ["Ubuntu", "Chrome", "20.0.04"],
-    });
+  version,
+  auth: state,
+  logger: pino({ level: "silent" }),
+  printQRInTerminal: false,
+  markOnlineOnConnect: true,
+  syncFullHistory: false,
+  keepAliveIntervalMs: 30000,
+  browser: ["C-LICON BOT", "Chrome", "2.0.0"],
+});
 
     sock.ev.on("creds.update", saveCreds);
 
