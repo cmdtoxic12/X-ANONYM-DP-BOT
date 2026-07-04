@@ -1,5 +1,6 @@
 module.exports = {
   name: "vv",
+  category: "main",
   description: "Reveals a View Once message (reply to the view once media with .vv)",
   aliases: ["viewonce", "reveal"],
 
