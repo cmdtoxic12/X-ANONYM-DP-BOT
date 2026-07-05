@@ -8,7 +8,7 @@ const {
 const pino = require("pino");
 const fs = require("fs-extra");
 const path = require("path");
-
+const { checkForUpdates } = require("./lib/updater");
 const config = require("./config");
 const { getText, isOwner } = require("./lib/functions");
 const { loadSettings, saveSettings } = require("./lib/settings");
@@ -27,7 +27,7 @@ const ownerOnlyCommands = [
   "autotyping",
   "alwaysonline",
   "autostatusview",
-  "autostatusreact"
+  "autostatusreact",
 ];
 
 function loadPlugins() {
@@ -37,7 +37,9 @@ function loadPlugins() {
     fs.mkdirSync(pluginFolder);
   }
 
-  const files = fs.readdirSync(pluginFolder).filter(file => file.endsWith(".js"));
+  const files = fs
+    .readdirSync(pluginFolder)
+    .filter((file) => file.endsWith(".js"));
 
   for (const file of files) {
     delete require.cache[require.resolve(path.join(pluginFolder, file))];
@@ -74,8 +76,8 @@ async function getDPFiles() {
   const files = await fs.readdir(DP_FOLDER);
 
   return files
-    .filter(file => /\.(jpg|jpeg|png)$/i.test(file))
-    .map(file => path.join(DP_FOLDER, file));
+    .filter((file) => /\.(jpg|jpeg|png)$/i.test(file))
+    .map((file) => path.join(DP_FOLDER, file));
 }
 
 async function changeProfilePicture() {
@@ -144,18 +146,23 @@ async function handleSettingCommands(sock, msg, command, args) {
       await sock.sendPresenceUpdate("unavailable");
     }
 
-    return reply(`✅ Always Online is now ${settings.alwaysonline ? "ON" : "OFF"}`);
+    return reply(
+      `✅ Always Online is now ${settings.alwaysonline ? "ON" : "OFF"}`,
+    );
   }
 
   if (command === "autostatusview") {
     if (!valid.includes(option)) return reply("Usage: .autostatusview on/off");
     settings.autostatusview = option === "on";
     await saveSettings(settings);
-    return reply(`✅ Auto Status View is now ${settings.autostatusview ? "ON" : "OFF"}`);
+    return reply(
+      `✅ Auto Status View is now ${settings.autostatusview ? "ON" : "OFF"}`,
+    );
   }
 
   if (command === "autostatusreact") {
-    if (!valid.includes(option)) return reply("Usage: .autostatusreact on/off ❤️");
+    if (!valid.includes(option))
+      return reply("Usage: .autostatusreact on/off ❤️");
 
     settings.autostatusreact = option === "on";
 
@@ -181,15 +188,15 @@ async function startBot() {
     const { version } = await fetchLatestBaileysVersion();
 
     sock = makeWASocket({
-  version,
-  auth: state,
-  logger: pino({ level: "silent" }),
-  printQRInTerminal: false,
-  markOnlineOnConnect: true,
-  syncFullHistory: false,
-  keepAliveIntervalMs: 30000,
-  browser: ["C-LICON BOT", "Chrome", "2.0.0"],
-});
+      version,
+      auth: state,
+      logger: pino({ level: "silent" }),
+      printQRInTerminal: false,
+      markOnlineOnConnect: true,
+      syncFullHistory: false,
+      keepAliveIntervalMs: 30000,
+      browser: ["C-LICON BOT", "Chrome", "2.0.0"],
+    });
 
     sock.ev.on("creds.update", saveCreds);
 
@@ -212,176 +219,189 @@ async function startBot() {
     }
 
     sock.ev.on("messages.upsert", async ({ messages }) => {
-  const msg = messages[0];
-  if (!msg.message) return;
+      const msg = messages[0];
+      if (!msg.message) return;
 
-  const from = msg.key.remoteJid;
-  const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+      const from = msg.key.remoteJid;
+      const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
 
-let sender;
+      let sender;
 
-if (msg.key.fromMe) {
-  sender = botJid;
-} else {
-  sender = msg.key.participant || msg.key.remoteJid;
-}
+      if (msg.key.fromMe) {
+        sender = botJid;
+      } else {
+        sender = msg.key.participant || msg.key.remoteJid;
+      }
 
-  const settings = await loadSettings();
+      const settings = await loadSettings();
 
-  if (settings.autoread) {
-    await sock.readMessages([msg.key]);
-  }
+      if (settings.autoread) {
+        await sock.readMessages([msg.key]);
+      }
 
-  if (settings.autotyping && !msg.key.fromMe) {
-    await sock.sendPresenceUpdate("composing", from);
-    setTimeout(() => {
-      sock.sendPresenceUpdate("paused", from).catch(() => {});
-    }, 3000);
-  }
+      if (settings.autotyping && !msg.key.fromMe) {
+        await sock.sendPresenceUpdate("composing", from);
+        setTimeout(() => {
+          sock.sendPresenceUpdate("paused", from).catch(() => {});
+        }, 3000);
+      }
 
-  if (from === "status@broadcast") {
-  if (settings.autostatusview) {
-    await sock.readMessages([msg.key]);
+      if (from === "status@broadcast") {
+        if (settings.autostatusview) {
+          await sock.readMessages([msg.key]);
 
-    console.log("━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("👀 STATUS VIEWED");
-    console.log("From:", msg.key.participant || "Unknown");
-    console.log("Time:", new Date().toLocaleString());
-    console.log("━━━━━━━━━━━━━━━━━━━━━━");
-}
+          console.log("━━━━━━━━━━━━━━━━━━━━━━");
+          console.log("👀 STATUS VIEWED");
+          console.log("From:", msg.key.participant || "Unknown");
+          console.log("Time:", new Date().toLocaleString());
+          console.log("━━━━━━━━━━━━━━━━━━━━━━");
+        }
 
-  if (settings.autostatusreact) {
-  console.log("⚠️ Auto status react is enabled, but disabled in code for stability.");
-}
+        if (settings.autostatusreact) {
+          console.log(
+            "⚠️ Auto status react is enabled, but disabled in code for stability.",
+          );
+        }
 
-  return;
-}
+        return;
+      }
 
-  //if (msg.key.fromMe) return;
+      //if (msg.key.fromMe) return;
 
-  // ✅ This allows games like WCG to read normal messages like "join" or "apple"
-  for (const plugin of plugins.values()) {
-    if (typeof plugin.before === "function") {
-      await plugin.before({
+      // ✅ This allows games like WCG to read normal messages like "join" or "apple"
+      for (const plugin of plugins.values()) {
+        if (typeof plugin.before === "function") {
+          await plugin.before({
+            sock,
+            from,
+            msg,
+            sender,
+          });
+        }
+      }
+
+      const body = getText(msg);
+      if (!body.startsWith(config.PREFIX)) return;
+
+      const args = body.slice(config.PREFIX.length).trim().split(/\s+/);
+      const command = args.shift().toLowerCase();
+
+      if (
+        ownerOnlyCommands.includes(command) &&
+        !isOwner(msg, config.OWNER_NUMBER)
+      ) {
+        return sock.sendMessage(
+          from,
+          { text: "❌ This command is owner-only." },
+          { quoted: msg },
+        );
+      }
+
+      const settingResult = await handleSettingCommands(
         sock,
-        from,
         msg,
+        command,
+        args,
+      );
+      if (settingResult !== false) return;
+
+      const plugin = plugins.get(command);
+
+      if (!plugin) {
+        return sock.sendMessage(
+          from,
+          {
+            text: `❌ Unknown command: ${config.PREFIX}${command}\nUse ${config.PREFIX}menu`,
+          },
+          { quoted: msg },
+        );
+      }
+
+      await plugin.execute({
+        sock,
+        msg,
+        from,
         sender,
+        args,
+        command,
+        changeProfilePicture,
+        plugins,
       });
-    }
-  }
-
-  const body = getText(msg);
-  if (!body.startsWith(config.PREFIX)) return;
-
-  const args = body.slice(config.PREFIX.length).trim().split(/\s+/);
-  const command = args.shift().toLowerCase();
-
-  if (ownerOnlyCommands.includes(command) && !isOwner(msg, config.OWNER_NUMBER)) {
-  return sock.sendMessage(
-    from,
-    { text: "❌ This command is owner-only." },
-    { quoted: msg }
-  );
-}
-
-  const settingResult = await handleSettingCommands(sock, msg, command, args);
-  if (settingResult !== false) return;
-
-  const plugin = plugins.get(command);
-
-  if (!plugin) {
-    return sock.sendMessage(
-      from,
-      {
-        text: `❌ Unknown command: ${config.PREFIX}${command}\nUse ${config.PREFIX}menu`,
-      },
-      { quoted: msg }
-    );
-  }
-
-  await plugin.execute({
-    sock,
-    msg,
-    from,
-    sender,
-    args,
-    command,
-    changeProfilePicture,
-    plugins,
-  });
-});
+    });
 
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect } = update;
 
       if (connection === "open") {
-  console.log("✅ Successfully connected to WhatsApp!");
-  console.log(`👤 JID: ${sock.user.id}`);
+        console.log("✅ Successfully connected to WhatsApp!");
+        console.log(`👤 JID: ${sock.user.id}`);
 
-  const ownerJid = config.OWNER_NUMBER + "@s.whatsapp.net";
+        const ownerJid = config.OWNER_NUMBER + "@s.whatsapp.net";
 
-  await sock.sendMessage(ownerJid, {
-    text:
-      `✅ *${config.BOT_NAME} CONNECTED*\n\n` +
-      `🤖 Bot is now online.\n` +
-      `🔄 Status: Connected / Restarted\n` +
-      `👤 JID: ${sock.user.id}\n` +
-      `⏱️ Time: ${new Date().toLocaleString()}\n\n` +
-      `Use ${config.PREFIX}menu to view commands.`
-  });
+        await sock.sendMessage(ownerJid, {
+          text:
+            `✅ *${config.BOT_NAME} CONNECTED*\n\n` +
+            `🤖 Bot is now online.\n` +
+            `🔄 Status: Connected / Restarted\n` +
+            `👤 JID: ${sock.user.id}\n` +
+            `⏱️ Time: ${new Date().toLocaleString()}\n\n` +
+            `Use ${config.PREFIX}menu to view commands.`,
+        });
 
-  const settings = await loadSettings();
+        const settings = await loadSettings();
 
-  if (settings.alwaysonline) {
-    await sock.sendPresenceUpdate("available");
-  }
+        if (settings.alwaysonline) {
+          await sock.sendPresenceUpdate("available");
+        }
 
-  if (dpInterval) clearInterval(dpInterval);
+        if (dpInterval) clearInterval(dpInterval);
 
-  // await changeProfilePicture();
+        // await changeProfilePicture();
 
-  dpInterval = setInterval(changeProfilePicture, config.DP_CHANGE_INTERVAL);
-}
+        dpInterval = setInterval(
+          changeProfilePicture,
+          config.DP_CHANGE_INTERVAL,
+        );
+      }
 
       if (connection === "close") {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
 
         console.log(`❌ Connection closed. Code: ${statusCode}`);
 
-        if (
-          statusCode === DisconnectReason.loggedOut ||
-          statusCode === 401
-        ) {
+        if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
           console.log("❌ Logged out or invalid session.");
           console.log("🗑️ Delete auth_info_baileys folder and restart.");
           process.exit(0);
         }
 
         console.log("🔄 Reconnecting in 5 seconds...");
-       if (connection === "close") {
-    const shouldReconnect =
-        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+        if (connection === "close") {
+          const shouldReconnect =
+            lastDisconnect?.error?.output?.statusCode !==
+            DisconnectReason.loggedOut;
 
-    console.log(
-        "Connection closed:",
-        lastDisconnect?.error?.output?.statusCode
-    );
+          console.log(
+            "Connection closed:",
+            lastDisconnect?.error?.output?.statusCode,
+          );
 
-    if (shouldReconnect) {
-        try {
-            sock.ev.removeAllListeners();
-            sock.ws?.close?.();
-        } catch {}
+          if (shouldReconnect) {
+            try {
+              sock.ev.removeAllListeners();
+              sock.ws?.close?.();
+            } catch {}
 
-        setTimeout(() => {
-            console.log("🔄 Reconnecting...");
-            startBot();
-        }, 5000);
-    } else {
-        console.log("❌ Logged out. Delete auth_info_baileys and pair again.");
-    }
-}
+            setTimeout(() => {
+              console.log("🔄 Reconnecting...");
+              startBot();
+            }, 5000);
+          } else {
+            console.log(
+              "❌ Logged out. Delete auth_info_baileys and pair again.",
+            );
+          }
+        }
       }
     });
   } catch (err) {
