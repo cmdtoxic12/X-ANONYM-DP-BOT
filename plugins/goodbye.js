@@ -15,7 +15,7 @@ text:`Usage
 
 .goodbye on
 .goodbye off`
-},{quoted:msg});
+},quoted:msg});
 
 settings.goodbye=args[0]=="on";
 
