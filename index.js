@@ -13,12 +13,23 @@ const config = require("./config");
 const { getText, isOwner } = require("./lib/functions");
 const { loadSettings, saveSettings } = require("./lib/settings");
 
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
 const AUTH_FOLDER = "auth_info_baileys";
 const DP_FOLDER = "./images";
 
 let sock;
 let currentDpIndex = 0;
 let dpInterval = null;
+let updateInterval = null;
+let pairingRequested = false;
+
 const plugins = new Map();
 
 const ownerOnlyCommands = [
@@ -42,13 +53,17 @@ function loadPlugins() {
     .filter((file) => file.endsWith(".js"));
 
   for (const file of files) {
-    delete require.cache[require.resolve(path.join(pluginFolder, file))];
+    try {
+      delete require.cache[require.resolve(path.join(pluginFolder, file))];
 
-    const plugin = require(path.join(pluginFolder, file));
+      const plugin = require(path.join(pluginFolder, file));
 
-    if (plugin.name && plugin.execute) {
-      plugins.set(plugin.name, plugin);
-      console.log(`✅ Loaded plugin: ${plugin.name}`);
+      if (plugin.name && plugin.execute) {
+        plugins.set(plugin.name, plugin);
+        console.log(`✅ Loaded plugin: ${plugin.name}`);
+      }
+    } catch (err) {
+      console.log(`❌ Failed to load plugin ${file}:`, err.message);
     }
   }
 }
@@ -69,7 +84,7 @@ function watchPlugins() {
 async function getDPFiles() {
   if (!(await fs.pathExists(DP_FOLDER))) {
     await fs.mkdir(DP_FOLDER);
-    console.log("✅ Created dps folder. Upload images there.");
+    console.log("✅ Created images folder. Upload images there.");
     return [];
   }
 
@@ -88,20 +103,15 @@ async function changeProfilePicture() {
     console.log("📁 DP files found:", dpFiles);
 
     if (dpFiles.length === 0) {
-      console.log("⚠️ No DP images found in dps folder.");
+      console.log("⚠️ No DP images found in images folder.");
       return;
     }
 
     const imagePath = dpFiles[currentDpIndex % dpFiles.length];
     currentDpIndex++;
 
-    console.log("🖼️ Selected image:", imagePath);
-
     const buffer = await fs.readFile(imagePath);
-    console.log("📦 Image buffer size:", buffer.length);
-
     const jid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
-    console.log("👤 Updating JID:", jid);
 
     await sock.updateProfilePicture(jid, buffer);
 
@@ -110,6 +120,7 @@ async function changeProfilePicture() {
     console.error("❌ Failed to change DP:", err);
   }
 }
+
 async function handleSettingCommands(sock, msg, command, args) {
   const from = msg.key.remoteJid;
   const settings = await loadSettings();
@@ -141,9 +152,9 @@ async function handleSettingCommands(sock, msg, command, args) {
     await saveSettings(settings);
 
     if (settings.alwaysonline) {
-      await sock.sendPresenceUpdate("available");
+      await sock.sendPresenceUpdate("available").catch(() => {});
     } else {
-      await sock.sendPresenceUpdate("unavailable");
+      await sock.sendPresenceUpdate("unavailable").catch(() => {});
     }
 
     return reply(
@@ -172,8 +183,9 @@ async function handleSettingCommands(sock, msg, command, args) {
 
     await saveSettings(settings);
 
-    return reply(`✅ Auto Status React is now ${settings.autostatusreact ? "ON" : "OFF"}
-Emoji: ${settings.statusReactEmoji}`);
+    return reply(
+      `✅ Auto Status React is now ${settings.autostatusreact ? "ON" : "OFF"}\nEmoji: ${settings.statusReactEmoji}`,
+    );
   }
 
   return false;
@@ -181,8 +193,7 @@ Emoji: ${settings.statusReactEmoji}`);
 
 async function startBot() {
   try {
-    loadPlugins();
-    watchPlugins();
+    pairingRequested = false;
 
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
     const { version } = await fetchLatestBaileysVersion();
@@ -199,138 +210,185 @@ async function startBot() {
     });
 
     sock.ev.on("creds.update", saveCreds);
-
-    if (!sock.authState.creds.registered) {
-      if (!config.OWNER_NUMBER || config.OWNER_NUMBER === "233XXXXXXXXX") {
-        console.log("❌ Edit OWNER_NUMBER in config.js first.");
-        return;
-      }
-
+    if (!state.creds.registered) {
       setTimeout(async () => {
         try {
-          console.log("🔑 Requesting pairing code...");
-          const code = await sock.requestPairingCode(config.OWNER_NUMBER);
-          console.log(`✅ YOUR PAIRING CODE: ${code}`);
+          const phoneNumber = String(config.OWNER_NUMBER).replace(/\D/g, "");
+
+          console.log("🔑 Requesting pairing code for:", phoneNumber);
+
+          const code = await sock.requestPairingCode(phoneNumber);
+
+          console.log("");
+          console.log("✅ YOUR PAIRING CODE:", code);
+          console.log("");
         } catch (err) {
-          console.error("❌ Pairing code failed:", err.message);
-          console.log("🗑️ Delete auth_info_baileys folder and restart.");
+          console.log("❌ Pairing failed:", err.message);
         }
-      }, 3000);
+      }, 5000);
     }
 
     sock.ev.on("messages.upsert", async ({ messages }) => {
-      const msg = messages[0];
-      if (!msg.message) return;
+      try {
+        const msg = messages[0];
+        if (!msg.message) return;
 
-      const from = msg.key.remoteJid;
-      const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+        const from = msg.key.remoteJid;
+        const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
 
-      let sender;
+        let sender;
 
-      if (msg.key.fromMe) {
-        sender = botJid;
-      } else {
-        sender = msg.key.participant || msg.key.remoteJid;
-      }
-
-      const settings = await loadSettings();
-
-      if (settings.autoread) {
-        await sock.readMessages([msg.key]);
-      }
-
-      if (settings.autotyping && !msg.key.fromMe) {
-        await sock.sendPresenceUpdate("composing", from);
-        setTimeout(() => {
-          sock.sendPresenceUpdate("paused", from).catch(() => {});
-        }, 3000);
-      }
-
-      if (from === "status@broadcast") {
-        if (settings.autostatusview) {
-          await sock.readMessages([msg.key]);
-
-          console.log("━━━━━━━━━━━━━━━━━━━━━━");
-          console.log("👀 STATUS VIEWED");
-          console.log("From:", msg.key.participant || "Unknown");
-          console.log("Time:", new Date().toLocaleString());
-          console.log("━━━━━━━━━━━━━━━━━━━━━━");
+        if (msg.key.fromMe) {
+          sender = botJid;
+        } else {
+          sender = msg.key.participant || msg.key.remoteJid;
         }
 
-        if (settings.autostatusreact) {
-          console.log(
-            "⚠️ Auto status react is enabled, but disabled in code for stability.",
+        const settings = await loadSettings();
+
+        if (
+          settings.autoread &&
+          !msg.key.fromMe &&
+          from !== "status@broadcast"
+        ) {
+          sock.readMessages([msg.key]).catch(() => {});
+        }
+
+        if (settings.autotyping && !msg.key.fromMe) {
+          await sock.sendPresenceUpdate("composing", from).catch(() => {});
+          setTimeout(() => {
+            sock.sendPresenceUpdate("paused", from).catch(() => {});
+          }, 3000);
+        }
+
+        if (from === "status@broadcast") {
+          if (settings.autostatusview) {
+            sock.readMessages([msg.key]).catch(() => {});
+
+            console.log("━━━━━━━━━━━━━━━━━━━━━━");
+            console.log("👀 STATUS VIEWED");
+            console.log("From:", msg.key.participant || "Unknown");
+            console.log("Time:", new Date().toLocaleString());
+            console.log("━━━━━━━━━━━━━━━━━━━━━━");
+          }
+
+          if (settings.autostatusreact) {
+            console.log(
+              "⚠️ Auto status react is enabled, but disabled in code for stability.",
+            );
+          }
+
+          return;
+        }
+
+        for (const plugin of plugins.values()) {
+          if (typeof plugin.before === "function") {
+            try {
+              await plugin.before({
+                sock,
+                from,
+                msg,
+                sender,
+              });
+            } catch (err) {
+              console.error(`Before hook error (${plugin.name}):`, err.message);
+            }
+          }
+        }
+
+        const body = getText(msg);
+        if (!body.startsWith(config.PREFIX)) return;
+
+        const args = body.slice(config.PREFIX.length).trim().split(/\s+/);
+        const command = args.shift().toLowerCase();
+
+        if (
+          ownerOnlyCommands.includes(command) &&
+          !isOwner(msg, config.OWNER_NUMBER)
+        ) {
+          return sock.sendMessage(
+            from,
+            { text: "❌ This command is owner-only." },
+            { quoted: msg },
           );
         }
 
-        return;
-      }
+        const settingResult = await handleSettingCommands(
+          sock,
+          msg,
+          command,
+          args,
+        );
+        if (settingResult !== false) return;
 
-      //if (msg.key.fromMe) return;
+        const plugin = plugins.get(command);
 
-      // ✅ This allows games like WCG to read normal messages like "join" or "apple"
-      for (const plugin of plugins.values()) {
-        if (typeof plugin.before === "function") {
-          await plugin.before({
-            sock,
+        if (!plugin) {
+          return sock.sendMessage(
             from,
-            msg,
-            sender,
-          });
+            {
+              text: `❌ Unknown command: ${config.PREFIX}${command}\nUse ${config.PREFIX}menu`,
+            },
+            { quoted: msg },
+          );
         }
+
+        try {
+          await plugin.execute({
+            sock,
+            msg,
+            from,
+            sender,
+            args,
+            command,
+            changeProfilePicture,
+            plugins,
+          });
+        } catch (err) {
+          console.error(`Plugin error (${plugin.name}):`, err);
+          await sock.sendMessage(
+            from,
+            { text: "❌ Command failed." },
+            { quoted: msg },
+          );
+        }
+      } catch (err) {
+        console.error("Message handler error:", err);
       }
-
-      const body = getText(msg);
-      if (!body.startsWith(config.PREFIX)) return;
-
-      const args = body.slice(config.PREFIX.length).trim().split(/\s+/);
-      const command = args.shift().toLowerCase();
-
-      if (
-        ownerOnlyCommands.includes(command) &&
-        !isOwner(msg, config.OWNER_NUMBER)
-      ) {
-        return sock.sendMessage(
-          from,
-          { text: "❌ This command is owner-only." },
-          { quoted: msg },
-        );
-      }
-
-      const settingResult = await handleSettingCommands(
-        sock,
-        msg,
-        command,
-        args,
-      );
-      if (settingResult !== false) return;
-
-      const plugin = plugins.get(command);
-
-      if (!plugin) {
-        return sock.sendMessage(
-          from,
-          {
-            text: `❌ Unknown command: ${config.PREFIX}${command}\nUse ${config.PREFIX}menu`,
-          },
-          { quoted: msg },
-        );
-      }
-
-      await plugin.execute({
-        sock,
-        msg,
-        from,
-        sender,
-        args,
-        command,
-        changeProfilePicture,
-        plugins,
-      });
     });
 
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect } = update;
+
+      if (
+        connection === "connecting" &&
+        !sock.authState.creds.registered &&
+        !pairingRequested
+      ) {
+        pairingRequested = true;
+
+        try {
+          const phoneNumber = String(config.OWNER_NUMBER).replace(/\D/g, "");
+
+          if (!phoneNumber || phoneNumber === "233XXXXXXXXX") {
+            console.log("❌ Edit OWNER_NUMBER in config.js first.");
+            return;
+          }
+
+          console.log("🔑 Requesting pairing code...");
+          const code = await sock.requestPairingCode(phoneNumber);
+
+          console.log("");
+          console.log(`✅ YOUR PAIRING CODE: ${code}`);
+          console.log(
+            "Open WhatsApp > Linked Devices > Link a Device > Link with phone number",
+          );
+          console.log("");
+        } catch (err) {
+          console.error("❌ Pairing code failed:", err.message);
+          pairingRequested = false;
+        }
+      }
 
       if (connection === "open") {
         console.log("✅ Successfully connected to WhatsApp!");
@@ -338,29 +396,40 @@ async function startBot() {
 
         const ownerJid = config.OWNER_NUMBER + "@s.whatsapp.net";
 
-        await sock.sendMessage(ownerJid, {
-          text:
-            `✅ *${config.BOT_NAME} CONNECTED*\n\n` +
-            `🤖 Bot is now online.\n` +
-            `🔄 Status: Connected / Restarted\n` +
-            `👤 JID: ${sock.user.id}\n` +
-            `⏱️ Time: ${new Date().toLocaleString()}\n\n` +
-            `Use ${config.PREFIX}menu to view commands.`,
-        });
+        await sock
+          .sendMessage(ownerJid, {
+            text:
+              `✅ *${config.BOT_NAME} CONNECTED*\n\n` +
+              `🤖 Bot is now online.\n` +
+              `🔄 Status: Connected / Restarted\n` +
+              `👤 JID: ${sock.user.id}\n` +
+              `⏱️ Time: ${new Date().toLocaleString()}\n\n` +
+              `Use ${config.PREFIX}menu to view commands.`,
+          })
+          .catch(() => {});
 
         const settings = await loadSettings();
 
         if (settings.alwaysonline) {
-          await sock.sendPresenceUpdate("available");
+          await sock.sendPresenceUpdate("available").catch(() => {});
         }
 
         if (dpInterval) clearInterval(dpInterval);
 
-        // await changeProfilePicture();
-
         dpInterval = setInterval(
           changeProfilePicture,
           config.DP_CHANGE_INTERVAL,
+        );
+
+        if (updateInterval) clearInterval(updateInterval);
+
+        updateInterval = setInterval(
+          () => {
+            checkForUpdates(sock, config).catch((err) => {
+              console.log("Update check failed:", err.message);
+            });
+          },
+          10 * 60 * 1000,
         );
       }
 
@@ -370,38 +439,19 @@ async function startBot() {
         console.log(`❌ Connection closed. Code: ${statusCode}`);
 
         if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-          console.log("❌ Logged out or invalid session.");
-          console.log("🗑️ Delete auth_info_baileys folder and restart.");
-          process.exit(0);
+          console.log("🗑️ Bad session detected. Deleting auth...");
+          await fs.remove(AUTH_FOLDER);
         }
 
-        console.log("🔄 Reconnecting in 5 seconds...");
-        if (connection === "close") {
-          const shouldReconnect =
-            lastDisconnect?.error?.output?.statusCode !==
-            DisconnectReason.loggedOut;
+        try {
+          sock.ev.removeAllListeners();
+          sock.ws?.close?.();
+        } catch {}
 
-          console.log(
-            "Connection closed:",
-            lastDisconnect?.error?.output?.statusCode,
-          );
-
-          if (shouldReconnect) {
-            try {
-              sock.ev.removeAllListeners();
-              sock.ws?.close?.();
-            } catch {}
-
-            setTimeout(() => {
-              console.log("🔄 Reconnecting...");
-              startBot();
-            }, 5000);
-          } else {
-            console.log(
-              "❌ Logged out. Delete auth_info_baileys and pair again.",
-            );
-          }
-        }
+        setTimeout(() => {
+          console.log("🔄 Reconnecting...");
+          startBot();
+        }, 5000);
       }
     });
   } catch (err) {
@@ -410,4 +460,6 @@ async function startBot() {
   }
 }
 
+loadPlugins();
+watchPlugins();
 startBot();
