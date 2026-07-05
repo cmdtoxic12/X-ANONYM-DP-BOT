@@ -1,6 +1,6 @@
 module.exports = {
   name: "silentvv",
-  category: "main",
+  category: "utility",
   description: "Silent View Once reveal - sends media to your own PM (reply or react)",
   aliases: ["svv", "silentviewonce"],
 

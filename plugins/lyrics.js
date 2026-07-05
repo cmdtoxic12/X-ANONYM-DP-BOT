@@ -10,12 +10,18 @@ module.exports = {
     if (!query) {
       return sock.sendMessage(
         from,
-        { text: "Usage: .lyrics <song name>\nExample: .lyrics faded alan walker" },
-        { quoted: msg }
+        {
+          text: "Usage: .lyrics <song name>\nExample: .lyrics faded alan walker",
+        },
+        { quoted: msg },
       );
     }
 
-    await sock.sendMessage(from, { text: "🔍 Searching lyrics..." }, { quoted: msg });
+    await sock.sendMessage(
+      from,
+      { text: "🔍 Searching lyrics..." },
+      { quoted: msg },
+    );
 
     try {
       const api = `https://api.vreden.my.id/api/lirik?query=${encodeURIComponent(query)}`;
@@ -31,7 +37,7 @@ module.exports = {
         return sock.sendMessage(
           from,
           { text: "❌ Lyrics not found." },
-          { quoted: msg }
+          { quoted: msg },
         );
       }
 
@@ -41,17 +47,13 @@ module.exports = {
         `👤 Artist: ${artist}\n\n` +
         `${lyrics.slice(0, 3500)}`;
 
-      await sock.sendMessage(
-        from,
-        { text: caption },
-        { quoted: msg }
-      );
+      await sock.sendMessage(from, { text: caption }, { quoted: msg });
     } catch (err) {
       console.log("Lyrics Error:", err.message);
       await sock.sendMessage(
         from,
         { text: "❌ Failed to fetch lyrics." },
-        { quoted: msg }
+        { quoted: msg },
       );
     }
   },

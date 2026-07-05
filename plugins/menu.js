@@ -80,6 +80,10 @@ ${buildCategory(plugins, "dp", config.PREFIX)}
 ${buildCategory(plugins, "utility", config.PREFIX)}
 ╰━━━━━━━━━━━━━━━━⬣
 
+╭──〔 🔧 MEDIA MENU 〕──⬣
+${buildCategory(plugins, "media", config.PREFIX)}
+╰━━━━━━━━━━━━━━━━⬣
+
 > Powered by ${config.BOT_NAME}
 `;
 
@@ -89,7 +93,7 @@ ${buildCategory(plugins, "utility", config.PREFIX)}
         image: { url: "./assets/menu.jpg" },
         caption: menuText,
       },
-      { quoted: msg }
+      { quoted: msg },
     );
   },
 };
