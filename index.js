@@ -1,4 +1,3 @@
-const makeWASocket = require("@whiskeysockets/baileys").default;
 const {
   default: makeWASocket,
   Browsers,
@@ -15,8 +14,12 @@ const config = require("./config");
 const { getText, isOwner } = require("./lib/functions");
 const { loadSettings, saveSettings } = require("./lib/settings");
 
-process.on("unhandledRejection", (err) => console.error("Unhandled Rejection:", err));
-process.on("uncaughtException", (err) => console.error("Uncaught Exception:", err));
+process.on("unhandledRejection", (err) =>
+  console.error("Unhandled Rejection:", err),
+);
+process.on("uncaughtException", (err) =>
+  console.error("Uncaught Exception:", err),
+);
 
 const AUTH_FOLDER = "auth_info_baileys";
 const DP_FOLDER = "./images";
@@ -29,15 +32,21 @@ let updateInterval = null;
 const plugins = new Map();
 
 const ownerOnlyCommands = [
-  "change", "autoread", "autotyping", "alwaysonline",
-  "autostatusview", "autostatusreact",
+  "change",
+  "autoread",
+  "autotyping",
+  "alwaysonline",
+  "autostatusview",
+  "autostatusreact",
 ];
 
 function loadPlugins() {
   const pluginFolder = path.join(__dirname, "plugins");
   if (!fs.existsSync(pluginFolder)) fs.mkdirSync(pluginFolder);
 
-  const files = fs.readdirSync(pluginFolder).filter(file => file.endsWith(".js"));
+  const files = fs
+    .readdirSync(pluginFolder)
+    .filter((file) => file.endsWith(".js"));
 
   for (const file of files) {
     try {
@@ -71,8 +80,8 @@ async function getDPFiles() {
   }
   const files = await fs.readdir(DP_FOLDER);
   return files
-    .filter(file => /\.(jpg|jpeg|png)$/i.test(file))
-    .map(file => path.join(DP_FOLDER, file));
+    .filter((file) => /\.(jpg|jpeg|png)$/i.test(file))
+    .map((file) => path.join(DP_FOLDER, file));
 }
 
 async function changeProfilePicture() {
@@ -103,81 +112,94 @@ async function handleSettingCommands(sock, msg, command, args) {
     await sock.sendMessage(from, { text }, { quoted: msg });
   };
 
-async function handleSettingCommands(sock, msg, command, args) {
-  const from = msg.key.remoteJid;
-  const settings = await loadSettings();
-  const option = args[0]?.toLowerCase();
+  async function handleSettingCommands(sock, msg, command, args) {
+    const from = msg.key.remoteJid;
+    const settings = await loadSettings();
+    const option = args[0]?.toLowerCase();
 
-  const valid = ["on", "off"];
+    const valid = ["on", "off"];
 
-  async function reply(text) {
-    await sock.sendMessage(from, { text }, { quoted: msg });
+    async function reply(text) {
+      await sock.sendMessage(from, { text }, { quoted: msg });
+    }
+
+    if (command === "autoread") {
+      if (!valid.includes(option)) return reply("Usage: .autoread on/off");
+      settings.autoread = option === "on";
+      await saveSettings(settings);
+      return reply(`✅ Auto Read is now ${settings.autoread ? "ON" : "OFF"}`);
+    }
+
+    if (command === "autotyping") {
+      if (!valid.includes(option)) return reply("Usage: .autotyping on/off");
+      settings.autotyping = option === "on";
+      await saveSettings(settings);
+      return reply(
+        `✅ Auto Typing is now ${settings.autotyping ? "ON" : "OFF"}`,
+      );
+    }
+
+    if (command === "alwaysonline") {
+      if (!valid.includes(option)) return reply("Usage: .alwaysonline on/off");
+      settings.alwaysonline = option === "on";
+      await saveSettings(settings);
+
+      if (settings.alwaysonline) {
+        await sock.sendPresenceUpdate("available").catch(() => {});
+      } else {
+        await sock.sendPresenceUpdate("unavailable").catch(() => {});
+      }
+
+      return reply(
+        `✅ Always Online is now ${settings.alwaysonline ? "ON" : "OFF"}`,
+      );
+    }
+
+    if (command === "autostatusview") {
+      if (!valid.includes(option))
+        return reply("Usage: .autostatusview on/off");
+      settings.autostatusview = option === "on";
+      await saveSettings(settings);
+      return reply(
+        `✅ Auto Status View is now ${settings.autostatusview ? "ON" : "OFF"}`,
+      );
+    }
+
+    if (command === "autostatusreact") {
+      if (!valid.includes(option))
+        return reply("Usage: .autostatusreact on/off ❤️");
+
+      settings.autostatusreact = option === "on";
+
+      if (args[1]) {
+        settings.statusReactEmoji = args[1];
+      }
+
+      await saveSettings(settings);
+
+      return reply(
+        `✅ Auto Status React is now ${settings.autostatusreact ? "ON" : "OFF"}\nEmoji: ${settings.statusReactEmoji}`,
+      );
+    }
+
+    return false;
   }
 
   if (command === "autoread") {
-    if (!valid.includes(option)) return reply("Usage: .autoread on/off");
-    settings.autoread = option === "on";
-    await saveSettings(settings);
-    return reply(`✅ Auto Read is now ${settings.autoread ? "ON" : "OFF"}`);
+    /* ... */
   }
-
   if (command === "autotyping") {
-    if (!valid.includes(option)) return reply("Usage: .autotyping on/off");
-    settings.autotyping = option === "on";
-    await saveSettings(settings);
-    return reply(`✅ Auto Typing is now ${settings.autotyping ? "ON" : "OFF"}`);
+    /* ... */
   }
-
   if (command === "alwaysonline") {
-    if (!valid.includes(option)) return reply("Usage: .alwaysonline on/off");
-    settings.alwaysonline = option === "on";
-    await saveSettings(settings);
-
-    if (settings.alwaysonline) {
-      await sock.sendPresenceUpdate("available").catch(() => {});
-    } else {
-      await sock.sendPresenceUpdate("unavailable").catch(() => {});
-    }
-
-    return reply(
-      `✅ Always Online is now ${settings.alwaysonline ? "ON" : "OFF"}`,
-    );
+    /* ... */
   }
-
   if (command === "autostatusview") {
-    if (!valid.includes(option)) return reply("Usage: .autostatusview on/off");
-    settings.autostatusview = option === "on";
-    await saveSettings(settings);
-    return reply(
-      `✅ Auto Status View is now ${settings.autostatusview ? "ON" : "OFF"}`,
-    );
+    /* ... */
   }
-
   if (command === "autostatusreact") {
-    if (!valid.includes(option))
-      return reply("Usage: .autostatusreact on/off ❤️");
-
-    settings.autostatusreact = option === "on";
-
-    if (args[1]) {
-      settings.statusReactEmoji = args[1];
-    }
-
-    await saveSettings(settings);
-
-    return reply(
-      `✅ Auto Status React is now ${settings.autostatusreact ? "ON" : "OFF"}\nEmoji: ${settings.statusReactEmoji}`,
-    );
+    /* ... */
   }
-
-  return false;
-}
-
-  if (command === "autoread") { /* ... */ }
-  if (command === "autotyping") { /* ... */ }
-  if (command === "alwaysonline") { /* ... */ }
-  if (command === "autostatusview") { /* ... */ }
-  if (command === "autostatusreact") { /* ... */ }
 
   return false;
 }
@@ -207,22 +229,32 @@ async function startBot() {
 
         const from = msg.key.remoteJid;
         const botJid = sock.user?.id?.split(":")[0] + "@s.whatsapp.net";
-        const sender = msg.key.fromMe ? botJid : (msg.key.participant || msg.key.remoteJid);
+        const sender = msg.key.fromMe
+          ? botJid
+          : msg.key.participant || msg.key.remoteJid;
 
         const settings = await loadSettings();
 
         // Auto features
-        if (settings.autoread && !msg.key.fromMe && from !== "status@broadcast") {
+        if (
+          settings.autoread &&
+          !msg.key.fromMe &&
+          from !== "status@broadcast"
+        ) {
           sock.readMessages([msg.key]).catch(() => {});
         }
 
         if (settings.autotyping && !msg.key.fromMe) {
           await sock.sendPresenceUpdate("composing", from).catch(() => {});
-          setTimeout(() => sock.sendPresenceUpdate("paused", from).catch(() => {}), 3000);
+          setTimeout(
+            () => sock.sendPresenceUpdate("paused", from).catch(() => {}),
+            3000,
+          );
         }
 
         if (from === "status@broadcast") {
-          if (settings.autostatusview) sock.readMessages([msg.key]).catch(() => {});
+          if (settings.autostatusview)
+            sock.readMessages([msg.key]).catch(() => {});
           // Auto react is disabled for stability as per original
           return;
         }
@@ -240,25 +272,46 @@ async function startBot() {
         const args = body.slice(config.PREFIX.length).trim().split(/\s+/);
         const command = args.shift().toLowerCase();
 
-        if (ownerOnlyCommands.includes(command) && !isOwner(msg, config.OWNER_NUMBER)) {
-          return sock.sendMessage(from, { text: "❌ Owner only command." }, { quoted: msg });
+        if (
+          ownerOnlyCommands.includes(command) &&
+          !isOwner(msg, config.OWNER_NUMBER)
+        ) {
+          return sock.sendMessage(
+            from,
+            { text: "❌ Owner only command." },
+            { quoted: msg },
+          );
         }
 
-        const settingResult = await handleSettingCommands(sock, msg, command, args);
+        const settingResult = await handleSettingCommands(
+          sock,
+          msg,
+          command,
+          args,
+        );
         if (settingResult !== false) return;
 
         const plugin = plugins.get(command);
         if (!plugin) {
-          return sock.sendMessage(from, {
-            text: `❌ Unknown command. Use ${config.PREFIX}menu`
-          }, { quoted: msg });
+          return sock.sendMessage(
+            from,
+            {
+              text: `❌ Unknown command. Use ${config.PREFIX}menu`,
+            },
+            { quoted: msg },
+          );
         }
 
         await plugin.execute({
-          sock, msg, from, sender, args, command,
-          changeProfilePicture, plugins
+          sock,
+          msg,
+          from,
+          sender,
+          args,
+          command,
+          changeProfilePicture,
+          plugins,
         });
-
       } catch (err) {
         console.error("Message handler error:", err);
       }
@@ -272,9 +325,11 @@ async function startBot() {
         console.log(`👤 JID: ${sock.user.id}`);
 
         const ownerJid = config.OWNER_NUMBER + "@s.whatsapp.net";
-        await sock.sendMessage(ownerJid, {
-          text: `✅ *${config.BOT_NAME}* is now online!\nPrefix: ${config.PREFIX}`
-        }).catch(() => {});
+        await sock
+          .sendMessage(ownerJid, {
+            text: `✅ *${config.BOT_NAME}* is now online!\nPrefix: ${config.PREFIX}`,
+          })
+          .catch(() => {});
 
         const settings = await loadSettings();
         if (settings.alwaysonline) {
@@ -284,13 +339,19 @@ async function startBot() {
         // Start DP rotation with small delay
         if (dpInterval) clearInterval(dpInterval);
         setTimeout(() => {
-          dpInterval = setInterval(changeProfilePicture, config.DP_CHANGE_INTERVAL || 600000);
+          dpInterval = setInterval(
+            changeProfilePicture,
+            config.DP_CHANGE_INTERVAL || 600000,
+          );
         }, 5000);
 
         if (updateInterval) clearInterval(updateInterval);
-        updateInterval = setInterval(() => {
-          checkForUpdates(sock, config).catch(console.error);
-        }, 10 * 60 * 1000);
+        updateInterval = setInterval(
+          () => {
+            checkForUpdates(sock, config).catch(console.error);
+          },
+          10 * 60 * 1000,
+        );
       }
 
       if (connection === "close") {
@@ -312,7 +373,6 @@ async function startBot() {
         setTimeout(startBot, 5000);
       }
     });
-
   } catch (err) {
     console.error("Fatal start error:", err);
     setTimeout(startBot, 5000);
