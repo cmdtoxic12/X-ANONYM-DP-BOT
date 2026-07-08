@@ -112,15 +112,14 @@ async function handleSettingCommands(sock, msg, command, args) {
     await sock.sendMessage(from, { text }, { quoted: msg });
   };
 
-  async function handleSettingCommands(sock, msg, command, args) {
-    const from = msg.key.remoteJid;
-    const settings = await loadSettings();
-    const option = args[0]?.toLowerCase();
-    const valid = ["on", "off"];
+async function handleSettingCommands(sock, msg, command, args) {
+  const from = msg.key.remoteJid;
+  const settings = await loadSettings();
+  const option = args[0]?.toLowerCase();
 
-    async function reply(text) {
-      return sock.sendMessage(from, { text }, { quoted: msg });
-    }
+  const reply = async (text) => {
+    await sock.sendMessage(from, { text }, { quoted: msg });
+  };
 
     if (command === "autoread") {
       if (!valid.includes(option)) return reply("Usage: .autoread on/off");
@@ -186,8 +185,8 @@ async function handleSettingCommands(sock, msg, command, args) {
       const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
       const { version } = await fetchLatestBaileysVersion();
 
-      const sock = makeWASocket({
-        version: [2, 3000, 1033893291],
+      sock = makeWASocket({
+        version,
         auth: state,
         logger: pino({ level: "silent" }),
         printQRInTerminal: false,
