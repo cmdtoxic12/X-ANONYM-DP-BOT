@@ -221,6 +221,19 @@ async function startBot() {
     });
 
     sock.ev.on("creds.update", saveCreds);
+    if (!state.creds.registered) {
+  setTimeout(async () => {
+    try {
+      const phoneNumber = String(config.OWNER_NUMBER).replace(/\D/g, "");
+      console.log("🔑 Requesting pairing code for:", phoneNumber);
+
+      const code = await sock.requestPairingCode(phoneNumber);
+      console.log(`✅ YOUR PAIRING CODE: ${code}`);
+    } catch (err) {
+      console.log("❌ Pairing failed:", err.message);
+    }
+  }, 5000);
+}
 
     sock.ev.on("messages.upsert", async ({ messages }) => {
       try {
