@@ -186,8 +186,8 @@ async function handleSettingCommands(sock, msg, command, args) {
       const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
       const { version } = await fetchLatestBaileysVersion();
 
-      sock = makeWASocket({
-        version,
+      const sock = makeWASocket({
+        version: [2, 3000, 1033893291],
         auth: state,
         logger: pino({ level: "silent" }),
         printQRInTerminal: false,
