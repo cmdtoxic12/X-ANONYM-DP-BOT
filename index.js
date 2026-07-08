@@ -1,5 +1,7 @@
 const makeWASocket = require("@whiskeysockets/baileys").default;
 const {
+  default: makeWASocket,
+  Browsers,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
@@ -169,7 +171,7 @@ async function handleSettingCommands(sock, msg, command, args) {
   }
 
   return false;
-}.
+}
 
   if (command === "autoread") { /* ... */ }
   if (command === "autotyping") { /* ... */ }
@@ -193,7 +195,7 @@ async function startBot() {
       markOnlineOnConnect: true,
       syncFullHistory: false,
       keepAliveIntervalMs: 30000,
-      browser: ["C-LICON BOT", "Chrome", "2.0.0"],
+      browser: Browsers.macOS("C-LICON BOT"),
     });
 
     sock.ev.on("creds.update", saveCreds);
