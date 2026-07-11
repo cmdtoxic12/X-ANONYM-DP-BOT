@@ -90,7 +90,7 @@ ${buildCategory(plugins, "media", config.PREFIX)}
     await sock.sendMessage(
       from,
       {
-        image: { url: "./assets/menu.jpg" },
+        image: { url: "https://files.catbox.moe/m1t25y.png" },
         caption: menuText,
       },
       { quoted: msg },
