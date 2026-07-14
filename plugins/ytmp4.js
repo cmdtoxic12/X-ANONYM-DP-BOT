@@ -1,40 +1,70 @@
+const {
+  resolveVideo,
+  downloadVideo,
+  removeTemporaryFile,
+  sanitizeFileName,
+} = require("../lib/youtubeDownloader");
+
 module.exports = {
   name: "ytmp4",
+  aliases: ["ytvideo", "video"],
   category: "download",
-  description: "Download YouTube video",
+  description: "Download a YouTube video",
 
   async execute({ sock, from, msg, args }) {
-    const url = args[0];
+    const input = args.join(" ").trim();
+    let filePath = null;
 
-    if (!url) {
-      return sock.sendMessage(from, { text: "Usage: .ytmp4 <youtube url>" }, { quoted: msg });
+    if (!input) {
+      return sock.sendMessage(
+        from,
+        {
+          text: "Usage: `.ytmp4 <YouTube URL or video title>`",
+        },
+        { quoted: msg },
+      );
     }
 
-    await sock.sendMessage(from, { text: "🎬 Downloading video..." }, { quoted: msg });
-
     try {
-      const api = `https://api.vreden.my.id/api/ytmp4?url=${encodeURIComponent(url)}`;
-      const res = await fetch(api);
-      const json = await res.json();
+      await sock.sendMessage(
+        from,
+        { text: "🎬 Preparing video..." },
+        { quoted: msg },
+      );
 
-      const result = json.result || json.data;
-      const video = result?.download?.url || result?.url || result?.link;
+      const video = await resolveVideo(input);
 
-      if (!video) {
-        return sock.sendMessage(from, { text: "❌ Failed to get video link." }, { quoted: msg });
+      if (video.durationSeconds && video.durationSeconds > 20 * 60) {
+        throw new Error("The selected video is longer than 20 minutes.");
       }
+
+      filePath = await downloadVideo(video.url, video.title);
 
       await sock.sendMessage(
         from,
         {
-          video: { url: video },
-          caption: `🎬 ${result.title || "Downloaded video"}`
+          video: { url: filePath },
+          mimetype: "video/mp4",
+          fileName: `${sanitizeFileName(video.title)}.mp4`,
+          caption:
+            `🎬 *${video.title}*\n\n` +
+            `👤 ${video.channel}\n` +
+            `⏱️ ${video.duration}`,
         },
-        { quoted: msg }
+        { quoted: msg },
       );
-    } catch (err) {
-      console.log("YTMP4 Error:", err.message);
-      await sock.sendMessage(from, { text: "❌ Download error." }, { quoted: msg });
+    } catch (error) {
+      console.error("YTMP4 ERROR:", error.message);
+
+      await sock.sendMessage(
+        from,
+        {
+          text: `❌ Video download failed.\n\nReason: ${error.message}`,
+        },
+        { quoted: msg },
+      );
+    } finally {
+      await removeTemporaryFile(filePath);
     }
-  }
+  },
 };

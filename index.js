@@ -11,10 +11,14 @@ const pino = require("pino");
 const fs = require("fs-extra");
 const path = require("path");
 const qrcode = require("qrcode-terminal");
+const playdl = require("play-dl");
+// Tells play-dl to use your real browser headers for text searches
+playdl.auth = { youtube: { cookie: "./youtube.txt" } };
 const { checkForUpdates } = require("./lib/updater"); // assuming this exports autoUpdate or similar
 const config = require("./config");
 const { getText, isOwner } = require("./lib/functions");
 const { loadSettings, saveSettings } = require("./lib/settings");
+const { clearOldTemporaryFiles } = require("./lib/youtubeDownloader");
 
 process.on("unhandledRejection", (err) =>
   console.error("Unhandled Rejection:", err),
@@ -409,6 +413,10 @@ console.log("👀 Watching plugins...");
 watchPlugins();
 
 console.log("🤖 Starting bot...");
+
+clearOldTemporaryFiles().catch((err) => {
+  console.log("Temporary cleanup failed:", err.message);
+});
 
 // Init
 loadPlugins();
