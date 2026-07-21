@@ -1,30 +1,34 @@
 const { loadSettings, saveSettings } = require("../lib/settings");
 
-module.exports={
+module.exports = {
+  name: "goodbye",
+  category: "group",
 
-name:"goodbye",
-category:"group",
+  async execute({ sock, from, msg, args }) {
+    const settings = await loadSettings();
 
-async execute({sock,from,msg,args}){
-
-const settings=await loadSettings();
-
-if(!args[0])
-return sock.sendMessage(from,{
-text:`Usage
+    if (!args[0])
+      return sock.sendMessage(
+        from,
+        {
+          text: `Usage
 
 .goodbye on
-.goodbye off`
-},quoted:msg});
+.goodbye off`,
+        },
+        { quoted: msg },
+      );
 
-settings.goodbye=args[0]=="on";
+    settings.goodbye = args[0] == "on";
 
-await saveSettings(settings);
+    await saveSettings(settings);
 
-sock.sendMessage(from,{
-text:`✅ Goodbye ${settings.goodbye?"Enabled":"Disabled"}`
-,{quoted:msg});
-
-}
-
-}
+    sock.sendMessage(
+      from,
+      {
+        text: `✅ Goodbye ${settings.goodbye ? "Enabled" : "Disabled"}`,
+      },
+      { quoted: msg },
+    );
+  },
+};

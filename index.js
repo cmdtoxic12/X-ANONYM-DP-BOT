@@ -60,7 +60,17 @@ function loadPlugins() {
       const plugin = require(path.join(pluginFolder, file));
       if (plugin.name && plugin.execute) {
         plugins.set(plugin.name, plugin);
+
         console.log(`✅ Loaded plugin: ${plugin.name}`);
+
+        // Load extra commands
+        if (Array.isArray(plugin.commands)) {
+          plugin.commands.forEach((cmd) => {
+            plugins.set(cmd, plugin);
+
+            console.log(`   ↳ Loaded alias: ${cmd}`);
+          });
+        }
       }
     } catch (err) {
       console.error(`❌ Failed to load plugin ${file}:`, err.message);
@@ -266,6 +276,19 @@ async function startBot() {
 
         const args = body.slice(config.PREFIX.length).trim().split(/\s+/);
         const command = args.shift().toLowerCase();
+
+        const ownerOnlyCommands = [
+          "change",
+          "autoread",
+          "autotyping",
+          "alwaysonline",
+          "autostatusview",
+          "autostatusreact",
+          "mode",
+          "restart",
+          "stop",
+          "shutdown",
+        ];
 
         if (
           ownerOnlyCommands.includes(command) &&

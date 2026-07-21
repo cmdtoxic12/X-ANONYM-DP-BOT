@@ -22,13 +22,14 @@ function formatRam() {
 function buildCategory(plugins, category, prefix) {
   const list = [];
 
-  for (const plugin of plugins.values()) {
-    if (plugin.category === category && plugin.name !== "menu") {
-      list.push(`┃ ❯❯ ${prefix}${plugin.name}`);
+  for (const [command, plugin] of plugins.entries()) {
+    if (plugin.category === category && command !== "menu") {
+      list.push(`┃ ❯❯ ${prefix}${command}`);
     }
   }
 
-  return list.length ? list.join("\n") : "┃ No commands yet";
+  // remove duplicates
+  return list.length ? [...new Set(list)].join("\n") : "┃ No commands yet";
 }
 
 module.exports = {
@@ -54,6 +55,10 @@ module.exports = {
 
 ╭──〔 📌 MAIN MENU 〕──⬣
 ${buildCategory(plugins, "main", config.PREFIX)}
+╰━━━━━━━━━━━━━━━━⬣
+
+╭──〔 📌 OWNER MENU 〕──⬣
+${buildCategory(plugins, "owner", config.PREFIX)}
 ╰━━━━━━━━━━━━━━━━⬣
 
 ╭──〔 📥 DOWNLOAD MENU 〕──⬣

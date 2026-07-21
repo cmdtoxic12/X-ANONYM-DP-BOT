@@ -3,6 +3,7 @@ module.exports = {
   OWNER_NAME: "C-LICON",
   OWNER_NUMBER: "233535679394",
   PREFIX: ".",
+  REMOVE_BG_KEY: "RFDLNjgwuNLJsd272JBhV3ko",
   VERSION: "2.0.0",
-  MODE: "Private"
+  MODE:"private",
 };
